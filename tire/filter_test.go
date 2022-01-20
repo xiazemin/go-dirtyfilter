@@ -64,12 +64,12 @@ func Test_tireFilter_FilterResult(t *testing.T) {
 				root:        nil,  // *node
 			},
 			args: args{
-				texts: []string{"中国", "人", "外国", "中国人", "中", "ab", "ef", "cd"}, //[]string
+				texts: []string{"中国", "人", "外国", "中国人", "中", "ab", "ef", "cd", "好"}, //[]string
 			},
-			want: [][]string{{"ab", "cd", "ef"}, {"中国"}, {"中国", "人"}, {"人", "外国"}}, //[][]string,
+			want: [][]string{{"ab", "cd", "ef"}, {"中国"}, {"中国", "人"}, {"中国", "人", "好"}, {"人", "外国"}}, //[][]string,
 			prepare: func(fields *fields, args *args) {
 				//httpmock.RegisterResponder("GET", "https://mytest.com/httpmock", httpmock.NewStringResponder(200, `[{"id": 1, "name": "My Great Test"}]`))
-				fileter := NewTireFilter([][]string{{"中国"}, {"中国", "人"}, {"人", "中国"}, {"外国", "人"}, {"不是", "中国", "人"}, {"cd", "ef", "ab"}}, true)
+				fileter := NewTireFilter([][]string{{"中国"}, {"中国", "人"}, {"人", "中国"}, {"外国", "人"}, {"不是", "中国", "人"}, {"中国", "好", "人"}, {"cd", "ef", "ab"}}, true)
 				fields.root = fileter.GetRoot()
 				fileter.Print()
 				gomock.InOrder()
