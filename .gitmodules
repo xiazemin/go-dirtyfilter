@@ -1,0 +1,6 @@
+[submodule "darts"]
+	path = darts
+	url = https://github.com/anknown/darts
+[submodule "go-darts"]
+	path = go-darts
+	url = https://github.com/awsong/go-darts
