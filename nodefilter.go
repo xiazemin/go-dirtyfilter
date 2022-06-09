@@ -91,14 +91,14 @@ func (nf *nodeFilter) Filter(text string, excludes ...rune) ([]string, error) {
 	return nf.FilterReader(buf, excludes...)
 }
 
-func (nf *nodeFilter) FilterResult(text string, excludes ...rune) (map[string]int, error) {
+func (nf *nodeFilter) FilterResult(text string, excludes ...rune) (map[string]int, map[string][]int, error) {
 	buf := bytes.NewBufferString(text)
 	defer buf.Reset()
 	return nf.FilterReaderResult(buf, excludes...)
 }
 
 func (nf *nodeFilter) FilterReader(reader io.Reader, excludes ...rune) ([]string, error) {
-	data, err := nf.FilterReaderResult(reader, excludes...)
+	data, _, err := nf.FilterReaderResult(reader, excludes...)
 	if err != nil {
 		return nil, err
 	}
@@ -109,17 +109,18 @@ func (nf *nodeFilter) FilterReader(reader io.Reader, excludes ...rune) ([]string
 	return result, nil
 }
 
-func (nf *nodeFilter) FilterReaderResult(reader io.Reader, excludes ...rune) (map[string]int, error) {
+func (nf *nodeFilter) FilterReaderResult(reader io.Reader, excludes ...rune) (map[string]int, map[string][]int, error) {
 	var (
 		uchars []rune
 	)
 	data := make(map[string]int)
+	dataToPos := make(map[string][]int)
 	bi := bufio.NewReader(reader)
 	for {
 		ur, _, err := bi.ReadRune()
 		if err != nil {
 			if err != io.EOF {
-				return nil, err
+				return nil, nil, err
 			}
 			break
 		}
@@ -127,16 +128,16 @@ func (nf *nodeFilter) FilterReaderResult(reader io.Reader, excludes ...rune) (ma
 			continue
 		}
 		if (unicode.IsSpace(ur) || unicode.IsPunct(ur)) && len(uchars) > 0 {
-			nf.doFilter(uchars[:], data)
+			nf.doFilter(uchars[:], data, dataToPos)
 			uchars = nil
 			continue
 		}
 		uchars = append(uchars, ur)
 	}
 	if len(uchars) > 0 {
-		nf.doFilter(uchars, data)
+		nf.doFilter(uchars, data, dataToPos)
 	}
-	return data, nil
+	return data, dataToPos, nil
 }
 
 func (nf *nodeFilter) Replace(text string, delim rune, excludes ...rune) (string, error) {
@@ -165,7 +166,7 @@ func (nf *nodeFilter) checkExclude(u rune, excludes ...rune) bool {
 	return exist
 }
 
-func (nf *nodeFilter) doFilter(uchars []rune, data map[string]int) {
+func (nf *nodeFilter) doFilter(uchars []rune, data map[string]int, dataToPos map[string][]int) {
 	var result []string
 	ul := len(uchars)
 	buf := new(bytes.Buffer)
@@ -178,6 +179,7 @@ func (nf *nodeFilter) doFilter(uchars []rune, data map[string]int) {
 		buf.WriteRune(uchars[i])
 		if n.end {
 			result = append(result, buf.String())
+			dataToPos[buf.String()] = append(dataToPos[buf.String()], i)
 		}
 		for j := i + 1; j < ul; j++ {
 			if _, ok := n.child[uchars[j]]; !ok {
@@ -187,6 +189,7 @@ func (nf *nodeFilter) doFilter(uchars []rune, data map[string]int) {
 			buf.WriteRune(uchars[j])
 			if n.end {
 				result = append(result, buf.String())
+				dataToPos[buf.String()] = append(dataToPos[buf.String()], i)
 			}
 		}
 		buf.Reset()
