@@ -72,6 +72,7 @@ func (tf *tireFilter) FilterResultCount(texts []string) map[string]int {
 			frequency[text]++
 		}
 	}
+
 	for _, li := range result {
 		if tf.ignoreOrder {
 			if _, ok := re[strings.Join(li, ",")]; ok {

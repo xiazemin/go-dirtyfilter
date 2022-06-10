@@ -116,8 +116,13 @@ func (nf *nodeFilter) FilterReaderResult(reader io.Reader, excludes ...rune) (ma
 	data := make(map[string]int)
 	dataToPos := make(map[string][]int)
 	bi := bufio.NewReader(reader)
+	stopPos := 0
+	skipPos := 0
+	curSkipPos := 0
+	var curSkipPosArr []int
 	for {
 		ur, _, err := bi.ReadRune()
+		stopPos += 1
 		if err != nil {
 			if err != io.EOF {
 				return nil, nil, err
@@ -125,17 +130,23 @@ func (nf *nodeFilter) FilterReaderResult(reader io.Reader, excludes ...rune) (ma
 			break
 		}
 		if nf.checkExclude(ur, excludes...) {
+			//skipPos++
+			curSkipPos++
 			continue
 		}
 		if (unicode.IsSpace(ur) || unicode.IsPunct(ur)) && len(uchars) > 0 {
-			nf.doFilter(uchars[:], data, dataToPos)
+			nf.doFilter(uchars[:], data, dataToPos, stopPos, skipPos, curSkipPosArr)
+			skipPos = skipPos + 1 + curSkipPos + len(uchars)
 			uchars = nil
+			curSkipPos = 0
+			curSkipPosArr = nil
 			continue
 		}
 		uchars = append(uchars, ur)
+		curSkipPosArr = append(curSkipPosArr, curSkipPos)
 	}
 	if len(uchars) > 0 {
-		nf.doFilter(uchars, data, dataToPos)
+		nf.doFilter(uchars, data, dataToPos, stopPos, skipPos, curSkipPosArr)
 	}
 	return data, dataToPos, nil
 }
@@ -166,11 +177,12 @@ func (nf *nodeFilter) checkExclude(u rune, excludes ...rune) bool {
 	return exist
 }
 
-func (nf *nodeFilter) doFilter(uchars []rune, data map[string]int, dataToPos map[string][]int) {
+func (nf *nodeFilter) doFilter(uchars []rune, data map[string]int, dataToPos map[string][]int, stopPos, skipPos int, curSkipPosArr []int) {
 	var result []string
 	ul := len(uchars)
 	buf := new(bytes.Buffer)
 	n := nf.root
+	//fmt.Println(stopPos, ul, skipPos)
 	for i := 0; i < ul; i++ {
 		if _, ok := n.child[uchars[i]]; !ok {
 			continue
@@ -179,7 +191,7 @@ func (nf *nodeFilter) doFilter(uchars []rune, data map[string]int, dataToPos map
 		buf.WriteRune(uchars[i])
 		if n.end {
 			result = append(result, buf.String())
-			dataToPos[buf.String()] = append(dataToPos[buf.String()], i)
+			dataToPos[buf.String()] = append(dataToPos[buf.String()], skipPos-curSkipPosArr[i]+1+i-len([]rune(buf.String())))
 		}
 		for j := i + 1; j < ul; j++ {
 			if _, ok := n.child[uchars[j]]; !ok {
@@ -189,7 +201,9 @@ func (nf *nodeFilter) doFilter(uchars []rune, data map[string]int, dataToPos map
 			buf.WriteRune(uchars[j])
 			if n.end {
 				result = append(result, buf.String())
-				dataToPos[buf.String()] = append(dataToPos[buf.String()], i)
+				dataToPos[buf.String()] = append(dataToPos[buf.String()], skipPos+curSkipPosArr[j]+1+j-len([]rune(buf.String())))
+
+				//fmt.Println(stopPos, skipPos, curSkipPosArr[j], j, ":", ul, skipPos+curSkipPosArr[j]+1+j-len([]rune(buf.String())), string([]rune(uchars[j-len([]rune(buf.String()))+1:j+1])))
 			}
 		}
 		buf.Reset()
